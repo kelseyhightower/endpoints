@@ -144,15 +144,14 @@ func watchEndpoints(namespace, service string, done <-chan struct{}) (<-chan []E
 					continue
 				}
 
+				decoder := json.NewDecoder(resp.Body)
 				for {
 					var o Object
-
-					err := json.NewDecoder(resp.Body).Decode(&o)
+					err := decoder.Decode(&o)
 					if ctx.Err() == context.Canceled {
 						resp.Body.Close()
 						break
 					}
-
 					if err != nil {
 						errc <- err
 						resp.Body.Close()
@@ -189,7 +188,6 @@ func doRequest(ctx context.Context, request *http.Request) (io.ReadCloser, error
 	if err != nil {
 		return nil, err
 	}
-
 	if resp.StatusCode == 404 {
 		return nil, ErrNotExist
 	}

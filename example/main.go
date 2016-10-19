@@ -33,12 +33,12 @@ func main() {
 			endpoint, err := lb.Next()
 			if err != nil {
 				log.Println(err)
-				time.Sleep(200 * time.Millisecond)
+				time.Sleep(500 * time.Millisecond)
 				continue
 			}
 			hostPort := net.JoinHostPort(endpoint.Host, endpoint.Port)
 			log.Println(hostPort)
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(500 * time.Millisecond)
 		}
 	}()
 
