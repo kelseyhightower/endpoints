@@ -128,7 +128,6 @@ func watchEndpoints(namespace, service string, done <-chan struct{}) (<-chan []E
 				if err != nil {
 					errc <- err
 					time.Sleep(5 * time.Second)
-					resp.Body.Close()
 					continue
 				}
 				if resp.StatusCode == 404 {

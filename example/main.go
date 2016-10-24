@@ -12,8 +12,9 @@
 package main
 
 import (
+	"fmt"
 	"log"
-	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -36,9 +37,15 @@ func main() {
 				time.Sleep(500 * time.Millisecond)
 				continue
 			}
-			hostPort := net.JoinHostPort(endpoint.Host, endpoint.Port)
-			log.Println(hostPort)
-			time.Sleep(500 * time.Millisecond)
+			urlStr := fmt.Sprintf("http://%s:%s", endpoint.Host, endpoint.Port)
+			resp, err := http.Get(urlStr)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			resp.Body.Close()
+			log.Printf("Endpoint %s response code: %s", urlStr, resp.Status)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}()
 
