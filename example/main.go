@@ -34,13 +34,18 @@ func main() {
 	flag.StringVar(&service, "service", "", "The Kubernetes service name")
 	flag.Parse()
 
-	lb, err := endpoints.New(&endpoints.Config{
+	config := &endpoints.Config{
 		Namespace: namespace,
 		Service:   service,
-	})
-	if err != nil {
+	}
+
+	lb := endpoints.New(config)
+
+	if err := lb.SyncEndpoints(); err != nil {
 		log.Fatal(err)
 	}
+
+	lb.StartBackgroundSync()
 
 	go func() {
 		c := http.Client{Timeout: time.Second}

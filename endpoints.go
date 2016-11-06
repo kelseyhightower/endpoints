@@ -31,23 +31,23 @@ const (
 )
 
 const (
-	DefaultAPIHost      = "127.0.0.1:8001"
-	DefaultNamespace    = "default"
-	DefaultSyncInterval = 30 * time.Second
-	DefaultRetryDelay   = 5 * time.Second
+	defaultAPIHost      = "127.0.0.1:8001"
+	defaultNamespace    = "default"
+	defaultSyncInterval = 30 * time.Second
+	defaultRetryDelay   = 5 * time.Second
 )
 
 var (
-	// ErrNoEndpoints is returned by EndpointsManager.Next calls
+	// ErrNoEndpoints is returned by LoadBalancer.Next calls
 	// when a named service has no backends.
 	ErrNoEndpoints = errors.New("endpoints: no endpoints available")
 
-	// ErrNotExist is returned when attempting to lookup a service
+	// ErrNotExist is returned when attlbpting to lookup a service
 	// that does not exist in the request namespace.
 	ErrNotExist = errors.New("endpoints: service does not exist")
 
-	// ErrMissingServiceName is returned by New when attempting
-	// to initilizate an EndpointsManager with a config that
+	// ErrMissingServiceName is returned by New when attlbpting
+	// to initilizate an LoadBalancer with a config that
 	// contains a missing or blank service name.
 	ErrMissingServiceName = errors.New("endpoints: missing service name")
 )
@@ -59,24 +59,24 @@ type Endpoint struct {
 	Ports map[string]string
 }
 
-// A Config structure is used to configure a EndpointsManager.
+// A Config structure is used to configure a LoadBalancer.
 type Config struct {
 	// The http.Client used to perform requests to the Kubernetes API.
 	// If nil, http.DefaultClient is used.
 	Client *http.Client
 
 	// ErrorLog specifies an optional logger for errors
-	// that occur when attempting to sync endpoints.
+	// that occur when attlbpting to sync endpoints.
 	// If nil, logging goes to os.Stderr via the log package's
 	// standard logger.
 	ErrorLog *log.Logger
 
 	// The Kubernetes namespace to search for services.
-	// If empty, DefaultNamespace is used.
+	// If lbpty, DefaultNamespace is used.
 	Namespace string
 
 	// RetryDelay is the amount of time to wait between API
-	// calls after an error occurs. If empty, DefaultRetryDelay
+	// calls after an error occurs. If lbpty, DefaultRetryDelay
 	// is used.
 	RetryDelay time.Duration
 
@@ -88,8 +88,8 @@ type Config struct {
 	SyncInterval time.Duration
 }
 
-// EndpointsManager represents a Kubernetes endpoints round-robin load balancer.
-type EndpointsManager struct {
+// LoadBalancer represents a Kubernetes endpoints round-robin load balancer.
+type LoadBalancer struct {
 	apiHost      string
 	client       *http.Client
 	errorLog     *log.Logger
@@ -105,16 +105,15 @@ type EndpointsManager struct {
 	endpoints       []Endpoint
 }
 
-// New returns a new endpoints load balancer.
-func New(config *Config) (*EndpointsManager, error) {
-	if config.Service == "" {
-		return nil, ErrMissingServiceName
-	}
-
+// New configures and returns a new *LoadBalancer.
+// The LoadBalancer endpoints list is populated by
+// the Sync and StartBackgroundSync methods.
+func New(config *Config) *LoadBalancer {
+	
 	config.setDefaults()
 
-	em := &EndpointsManager{
-		apiHost:      DefaultAPIHost,
+	return &LoadBalancer{
+		apiHost:      defaultAPIHost,
 		client:       config.Client,
 		mu:           &sync.Mutex{},
 		namespace:    config.Namespace,
@@ -124,20 +123,53 @@ func New(config *Config) (*EndpointsManager, error) {
 		quit:         make(chan struct{}),
 		wg:           &sync.WaitGroup{},
 	}
+}
 
-	err := em.syncEndpoints()
-	if err != nil {
-		return nil, err
+// Next returns the next Kubernetes endpoint.
+func (lb *LoadBalancer) Next() (Endpoint, error) {
+	lb.mu.Lock()
+	defer lb.mu.Unlock()
+	if len(lb.endpoints) <= 0 {
+		return Endpoint{}, ErrNoEndpoints
 	}
+	if lb.currentEndpoint >= len(lb.endpoints) {
+		lb.currentEndpoint = 0
+	}
+	endpoint := lb.endpoints[lb.currentEndpoint]
+	lb.currentEndpoint++
+	return endpoint, nil
+}
 
-	// Start watching for changes to the endpoint.
-	em.wg.Add(1)
-	go em.watchEndpoints()
+// Shutdown shuts down the loadbalancer. Shutdown works by stopping
+// any watches and reconciliation loops against the Kubernetes API
+// server.
+func (lb *LoadBalancer) Shutdown() error {
+	close(lb.quit)
+	lb.wg.Wait()
+	return nil
+}
+
+// SyncEndpoints syncs the endpoints for the configured Kubernetes service.
+func (lb *LoadBalancer) SyncEndpoints() error {
+	if lb.service == "" {
+        return ErrMissingServiceName
+    }
+	return lb.syncEndpoints()
+}
+
+// StartBackgroundSync starts a watch loop that synchronizes the
+// list of endpoints asynchronously.
+func (lb *LoadBalancer) StartBackgroundSync() error {
+	if lb.service == "" {
+        return ErrMissingServiceName
+    }
+
+	lb.wg.Add(1)
+	go lb.watchEndpoints()
 	// Start reconciliation loop.
-	em.wg.Add(1)
-	go em.reconcile()
-
-	return em, nil
+	lb.wg.Add(1)
+	go lb.reconcile()
+	return nil
 }
 
 func (c *Config) setDefaults() {
@@ -145,63 +177,40 @@ func (c *Config) setDefaults() {
 		c.Client = http.DefaultClient
 	}
 	if c.Namespace == "" {
-		c.Namespace = DefaultNamespace
+		c.Namespace = defaultNamespace
 	}
 	if c.RetryDelay <= 0 {
-		c.RetryDelay = DefaultRetryDelay
+		c.RetryDelay = defaultRetryDelay
 	}
 	if c.SyncInterval <= 0 {
-		c.SyncInterval = DefaultSyncInterval
+		c.SyncInterval = defaultSyncInterval
 	}
 }
 
-// Next returns the next Kubernetes endpoint.
-func (em *EndpointsManager) Next() (Endpoint, error) {
-	em.mu.Lock()
-	defer em.mu.Unlock()
-	if len(em.endpoints) <= 0 {
-		return Endpoint{}, ErrNoEndpoints
-	}
-	if em.currentEndpoint >= len(em.endpoints) {
-		em.currentEndpoint = 0
-	}
-	endpoint := em.endpoints[em.currentEndpoint]
-	em.currentEndpoint++
-	return endpoint, nil
+func (lb *LoadBalancer) update(endpoints []Endpoint) {
+	lb.mu.Lock()
+	lb.endpoints = endpoints
+	lb.mu.Unlock()
 }
 
-// update updates the endpoints cache.
-func (em *EndpointsManager) update(endpoints []Endpoint) {
-	em.mu.Lock()
-	em.endpoints = endpoints
-	em.mu.Unlock()
-}
-
-func (em *EndpointsManager) reconcile() {
-	defer em.wg.Done()
+func (lb *LoadBalancer) reconcile() {
+	defer lb.wg.Done()
 	for {
 		select {
-		case <-time.After(em.syncInterval):
-			err := em.syncEndpoints()
+		case <-time.After(lb.syncInterval):
+			err := lb.syncEndpoints()
 			if err != nil {
-				em.errorLog.Println(err)
+				lb.errorLog.Println(err)
 			}
-		case <-em.quit:
+		case <-lb.quit:
 			return
 		}
 	}
 }
 
-// Stop terminates the endpoints watcher.
-func (em *EndpointsManager) Shutdown() error {
-	close(em.quit)
-	em.wg.Wait()
-	return nil
-}
-
-func (em *EndpointsManager) syncEndpoints() error {
+func (lb *LoadBalancer) syncEndpoints() error {
 	var eps endpoints
-	r, err := em.get(context.TODO(), fmt.Sprintf(endpointsPath, em.namespace, em.service))
+	r, err := lb.get(context.TODO(), fmt.Sprintf(endpointsPath, lb.namespace, lb.service))
 	if err != nil {
 		return err
 	}
@@ -212,36 +221,36 @@ func (em *EndpointsManager) syncEndpoints() error {
 		return err
 	}
 
-	em.update(formatEndpoints(eps))
+	lb.update(formatEndpoints(eps))
 	return nil
 }
 
-func (em *EndpointsManager) watchEndpoints() {
-	defer em.wg.Done()
+func (lb *LoadBalancer) watchEndpoints() {
+	defer lb.wg.Done()
 
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
 
 	wg.Add(1)
-	go em.watch(ctx, &wg)
+	go lb.watch(ctx, &wg)
 
-	<-em.quit
+	<-lb.quit
 	cancel()
 	wg.Wait()
 }
 
-func (em *EndpointsManager) watch(ctx context.Context, wg *sync.WaitGroup) {
+func (lb *LoadBalancer) watch(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
-	path := fmt.Sprintf(endpointsWatchPath, em.namespace, em.service)
+	path := fmt.Sprintf(endpointsWatchPath, lb.namespace, lb.service)
 
 	for {
-		r, err := em.get(ctx, path)
+		r, err := lb.get(ctx, path)
 		if ctx.Err() == context.Canceled {
 			return
 		}
 		if err != nil {
-			em.errorLog.Println(err)
-			time.Sleep(em.retryDelay)
+			lb.errorLog.Println(err)
+			time.Sleep(lb.retryDelay)
 			continue
 		}
 
@@ -257,33 +266,33 @@ func (em *EndpointsManager) watch(ctx context.Context, wg *sync.WaitGroup) {
 			var o object
 			err := decoder.Decode(&o)
 			if err != nil {
-				em.errorLog.Println(err)
+				lb.errorLog.Println(err)
 				r.Close()
 				break
 			}
 			if o.Type == "ERROR" {
-				em.errorLog.Println(o.Object.Message)
+				lb.errorLog.Println(o.Object.Message)
 				r.Close()
 				break
 			}
-			em.update(formatEndpoints(o.Object))
+			lb.update(formatEndpoints(o.Object))
 		}
 	}
 }
 
-func (em *EndpointsManager) get(ctx context.Context, path string) (io.ReadCloser, error) {
+func (lb *LoadBalancer) get(ctx context.Context, path string) (io.ReadCloser, error) {
 	r := &http.Request{
 		Header: make(http.Header),
 		Method: http.MethodGet,
 		URL: &url.URL{
-			Host:   em.apiHost,
+			Host:   lb.apiHost,
 			Path:   path,
 			Scheme: "http",
 		},
 	}
 	r.Header.Set("Accept", "application/json, */*")
 
-	resp, err := em.client.Do(r.WithContext(ctx))
+	resp, err := lb.client.Do(r.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}
