@@ -29,7 +29,7 @@ const (
 )
 
 var (
-	DefaultAPIHost   = "127.0.0.1:8001"
+	DefaultAPIAddr   = "127.0.0.1:8001"
 	DefaultNamespace = "default"
 )
 
@@ -57,9 +57,9 @@ type Endpoint struct {
 
 // A Config structure is used to configure a LoadBalancer.
 type Config struct {
-	// APIHost specifies the Kubernetes host/port (127.0.0.1:8001)
-	// If empty, APIHost is used.
-	APIHost string
+	// APIAddr specifies the Kubernetes API "IP:port" address to use
+	// when synchronizing enpoints. If empty, DefaultAPIAddr is used.
+	APIAddr string
 
 	// The http.Client used to perform requests to the Kubernetes API.
 	// If nil, http.DefaultClient is used. Using the http.DefaultClient
@@ -97,7 +97,7 @@ type Config struct {
 
 // LoadBalancer represents a Kubernetes endpoints round-robin load balancer.
 type LoadBalancer struct {
-	apiHost      string
+	apiAddr      string
 	client       *http.Client
 	errorLog     *log.Logger
 	namespace    string
@@ -120,7 +120,7 @@ func New(config *Config) *LoadBalancer {
 	config.setDefaults()
 
 	return &LoadBalancer{
-		apiHost:      config.APIHost,
+		apiAddr:      config.APIAddr,
 		client:       config.Client,
 		mu:           &sync.RWMutex{},
 		namespace:    config.Namespace,
@@ -189,8 +189,8 @@ func (lb *LoadBalancer) StartBackgroundSync() error {
 }
 
 func (c *Config) setDefaults() {
-	if c.APIHost == "" {
-		c.APIHost = DefaultAPIHost
+	if c.APIAddr == "" {
+		c.APIAddr = DefaultAPIAddr
 	}
 	if c.Client == nil {
 		c.Client = http.DefaultClient
@@ -304,7 +304,7 @@ func (lb *LoadBalancer) get(ctx context.Context, path string) (io.ReadCloser, er
 		Header: make(http.Header),
 		Method: http.MethodGet,
 		URL: &url.URL{
-			Host:   lb.apiHost,
+			Host:   lb.apiAddr,
 			Path:   path,
 			Scheme: "http",
 		},
