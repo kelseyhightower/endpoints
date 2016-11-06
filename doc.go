@@ -14,9 +14,9 @@ Kubernetes cluster.
 Load balancers are created using a Config:
 
     config := &endpoints.Config{
-		Namespace: namespace,
-		Service:   service,
-	}
+        Namespace: namespace,
+        Service:   service,
+    }
     lb := endpoints.New(config)
 
 Before an endpoints load balancer can be used the endpoints must
@@ -28,9 +28,9 @@ Once the initial set of endpoints have been populated clients
 can call the Next method to the next endpoint:
 
     endpoint, err := lb.Next()
-	// ...
-	url := fmt.Sprintf("http://%s:%s", endpoint.Host, endpoint.Port)
-	resp, err := c.Get(url)
+    // ...
+    url := fmt.Sprintf("http://%s:%s", endpoint.Host, endpoint.Port)
+    resp, err := c.Get(url)
     // ...
 
 Clients can synchronize the endpoints load balancer backends in the
