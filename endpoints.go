@@ -1,13 +1,6 @@
 // Copyright 2016 Google Inc. All Rights Reserved.
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//     http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
 
 package endpoints
 
@@ -42,11 +35,11 @@ var (
 	// when a named service has no backends.
 	ErrNoEndpoints = errors.New("endpoints: no endpoints available")
 
-	// ErrNotExist is returned when attlbpting to lookup a service
+	// ErrNotExist is returned when attempting to lookup a service
 	// that does not exist in the request namespace.
 	ErrNotExist = errors.New("endpoints: service does not exist")
 
-	// ErrMissingServiceName is returned by New when attlbpting
+	// ErrMissingServiceName is returned by New when attempting
 	// to initilizate an LoadBalancer with a config that
 	// contains a missing or blank service name.
 	ErrMissingServiceName = errors.New("endpoints: missing service name")
@@ -66,17 +59,17 @@ type Config struct {
 	Client *http.Client
 
 	// ErrorLog specifies an optional logger for errors
-	// that occur when attlbpting to sync endpoints.
+	// that occur when attempting to sync endpoints.
 	// If nil, logging goes to os.Stderr via the log package's
 	// standard logger.
 	ErrorLog *log.Logger
 
 	// The Kubernetes namespace to search for services.
-	// If lbpty, DefaultNamespace is used.
+	// If empty, DefaultNamespace is used.
 	Namespace string
 
 	// RetryDelay is the amount of time to wait between API
-	// calls after an error occurs. If lbpty, DefaultRetryDelay
+	// calls after an error occurs. If empty, DefaultRetryDelay
 	// is used.
 	RetryDelay time.Duration
 
