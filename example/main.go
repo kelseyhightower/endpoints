@@ -12,6 +12,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -20,16 +21,29 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/kelseyhightower/elb"
+	"github.com/kelseyhightower/endpoints"
+)
+
+var (
+	namespace string
+	service   string
 )
 
 func main() {
-	lb, err := elb.New("", "nginx")
+	flag.StringVar(&namespace, "namespace", "default", "The Kubernetes namespace")
+	flag.StringVar(&service, "service", "", "The Kubernetes service name")
+	flag.Parse()
+
+	lb, err := endpoints.New(&endpoints.Config{
+		Namespace: namespace,
+		Service:   service,
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	go func() {
+		c := http.Client{Timeout: time.Second}
 		for {
 			endpoint, err := lb.Next()
 			if err != nil {
@@ -38,7 +52,7 @@ func main() {
 				continue
 			}
 			urlStr := fmt.Sprintf("http://%s:%s", endpoint.Host, endpoint.Port)
-			resp, err := http.Get(urlStr)
+			resp, err := c.Get(urlStr)
 			if err != nil {
 				log.Println(err)
 				continue
@@ -51,13 +65,8 @@ func main() {
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-	for {
-		select {
-		case <-signalChan:
-			log.Printf("Shutdown signal received, exiting...")
-			lb.Stop()
-			time.Sleep(5 * time.Second)
-			os.Exit(0)
-		}
-	}
+	<-signalChan
+	log.Printf("Shutdown signal received, exiting...")
+	lb.Shutdown()
+	os.Exit(0)
 }

@@ -2,8 +2,8 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: elb-nginx
-  name: elb-nginx
+    app: nginx
+  name: nginx
 spec:
   ports:
     - name: http
@@ -11,4 +11,4 @@ spec:
       protocol: TCP
       targetPort: 80
   selector:
-    app: elb-nginx
+    app: nginx

@@ -1,0 +1,30 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: endpoints
+  name: endpoints
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: endpoints
+      name: endpoints
+    spec:
+      containers:
+        - name: endpoints
+          image: "kelseyhightower/endpoints:0.0.1"
+          imagePullPolicy: Always
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          args:
+            - "-namespace=$(NAMESPACE)"
+            - "-service=nginx"
+        - name: kubectl
+          image: "kelseyhightower/kubectl:1.4.0"
+          args:
+            - "proxy"

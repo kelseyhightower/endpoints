@@ -1,3 +1,3 @@
 FROM scratch
-ADD elb-example /elb-example
-ENTRYPOINT ["/elb-example"]
+ADD endpoints /endpoints
+ENTRYPOINT ["/endpoints"]

@@ -1,0 +1,4 @@
+bash build
+docker build -t kelseyhightower/endpoints:0.0.1 .
+docker push kelseyhightower/endpoints:0.0.1
+rm endpoints
