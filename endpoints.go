@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -34,17 +35,13 @@ var (
 )
 
 var (
-	// ErrNoEndpoints is returned by LoadBalancer.Next calls
-	// when a named service has no backends.
+	// ErrNoEndpoints is returned by LoadBalancer.Next calls when a named service
+	// has no backends.
 	ErrNoEndpoints = errors.New("endpoints: no endpoints available")
 
-	// ErrNotExist is returned when attempting to lookup a service
-	// that does not exist in the request namespace.
-	ErrNotExist = errors.New("endpoints: service does not exist")
-
-	// ErrMissingServiceName is returned by New when attempting
-	// to initilizate an LoadBalancer with a config that
-	// contains a missing or blank service name.
+	// ErrMissingServiceName is returned by SyncEndpoints and StartBackgoundSync
+	// when attempting to synchronize endpoints with a config that contains a
+	// missing or blank service name.
 	ErrMissingServiceName = errors.New("endpoints: missing service name")
 )
 
@@ -73,26 +70,24 @@ type Config struct {
 	// requirements or custom behavior.
 	Client *http.Client
 
-	// ErrorLog specifies an optional logger for errors
-	// that occur when attempting to sync endpoints.
-	// If nil, logging goes to os.Stderr via the log package's
-	// standard logger.
+	// ErrorLog specifies an optional logger for errors that occur when
+	// attempting to sync endpoints. If nil, logging goes to os.Stderr via
+	// the log package's standard logger.
 	ErrorLog *log.Logger
 
 	// The Kubernetes namespace to search for services.
 	// If empty, DefaultNamespace is used.
 	Namespace string
 
-	// RetryDelay is the amount of time to wait between API
-	// calls after an error occurs. If empty, DefaultRetryDelay
-	// is used.
+	// RetryDelay is the amount of time to wait between API calls after an error
+	// occurs. If empty, DefaultRetryDelay is used.
 	RetryDelay time.Duration
 
 	// The Kubernetes service to monitor.
 	Service string
 
-	// SyncInterval is the amount of time between request to
-	// reconcile the list of endpoint backends from Kubernetes.
+	// SyncInterval is the amount of time between request to reconcile the list
+	// of endpoint backends from Kubernetes.
 	SyncInterval time.Duration
 }
 
@@ -113,11 +108,9 @@ type LoadBalancer struct {
 	endpoints       []Endpoint
 }
 
-// New configures and returns a new *LoadBalancer.
-// The LoadBalancer endpoints list is populated by
-// the Sync and StartBackgroundSync methods.
+// New configures and returns a new *LoadBalancer. The LoadBalancer endpoints
+// list is populated by the Sync and StartBackgroundSync methods.
 func New(config *Config) *LoadBalancer {
-
 	config.setDefaults()
 
 	return &LoadBalancer{
@@ -174,18 +167,21 @@ func (lb *LoadBalancer) SyncEndpoints() error {
 	return lb.syncEndpoints()
 }
 
-// StartBackgroundSync starts a watch loop that synchronizes the
-// list of endpoints asynchronously.
+// StartBackgroundSync starts a watch loop that synchronizes the list of
+// endpoints asynchronously.
 func (lb *LoadBalancer) StartBackgroundSync() error {
 	if lb.service == "" {
 		return ErrMissingServiceName
 	}
 
+	// Start watch loop.
 	lb.wg.Add(1)
 	go lb.watchEndpoints()
+
 	// Start reconciliation loop.
 	lb.wg.Add(1)
 	go lb.reconcile()
+
 	return nil
 }
 
@@ -291,13 +287,25 @@ func (lb *LoadBalancer) watch(ctx context.Context, wg *sync.WaitGroup) {
 				break
 			}
 			if o.Type == "ERROR" {
-				lb.errorLog.Println(o.Object.Message)
+				lb.errorLog.Printf("endpoints watch %s: %s", path, o.Object.Message)
 				r.Close()
 				break
 			}
 			lb.update(formatEndpoints(o.Object))
 		}
 	}
+}
+
+// SyncError records an error during an Kubernetes API call and the HTTP
+// request that caused it.
+type SyncError struct {
+	URL     string // URL used
+	Message string // description of the error
+	Code    int    // remote status code
+}
+
+func (e *SyncError) Error() string {
+	return fmt.Sprintf("endpoints get %s: %s %d", e.URL, e.Message, e.Code)
 }
 
 func (lb *LoadBalancer) get(ctx context.Context, path string) (io.ReadCloser, error) {
@@ -312,16 +320,28 @@ func (lb *LoadBalancer) get(ctx context.Context, path string) (io.ReadCloser, er
 	}
 	r.Header.Set("Accept", "application/json, */*")
 
+	url := r.URL.String()
+
 	resp, err := lb.client.Do(r.WithContext(ctx))
 	if err != nil {
-		return nil, err
+		return nil, &SyncError{url, err.Error(), 500}
 	}
-	if resp.StatusCode == 404 {
-		return nil, ErrNotExist
-	}
+
 	if resp.StatusCode != 200 {
-		return nil, errors.New("error non 200 reponse: " + resp.Status)
+		d, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, &SyncError{url, err.Error(), resp.StatusCode}
+		}
+
+		// Decode the remote error.
+		var s status
+		err = json.Unmarshal(d, &s)
+		if err != nil {
+			return nil, &SyncError{url, err.Error(), resp.StatusCode}
+		}
+		return nil, &SyncError{url, s.Message, s.Code}
 	}
+
 	return resp.Body, nil
 }
 

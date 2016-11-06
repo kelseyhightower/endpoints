@@ -34,3 +34,8 @@ type port struct {
 	Name string `json:"name"`
 	Port int32  `json:"port"`
 }
+
+type status struct {
+	Message string `json:"message"`
+	Code    int    `json:"code"`
+}
