@@ -6,6 +6,8 @@
 
 Package endpoints provides an implementation of a client-side load balancer that distributes client request across a collection of Kubernetes endpoints using a basic Round-robin algorithm. The endpoints load balancer does not operate in the data path and only manages a list of backends based on services defined in a Kubernetes cluster.
 
+<img src="https://github.com/kelseyhightower/endpoints/endpoints.png" width="100">
+
 ### Use Cases
 
 * Reduce latency by avoiding DNS lookups. Endpoints are returned as IP addresses and one or more ports.
