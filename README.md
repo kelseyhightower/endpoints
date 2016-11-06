@@ -13,8 +13,6 @@ import (
 )
 
 func main() {
-	// Initialize an endpoints round-robin loadbalancer with
-	// an endpoints config.
 	config := &endpoints.Config{
 		Namespace: "default",
 		Service:   "nginx",
@@ -26,8 +24,6 @@ func main() {
 	}
 
 	for {
-		// Round-robin the Kubernetes endpoints that back the
-		// nginx service.
 		endpoint, err := backends.Next()
 		if err != nil {
 			log.Println(err)
