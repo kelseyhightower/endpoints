@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -101,9 +102,9 @@ type LoadBalancer struct {
 	service      string
 	syncInterval time.Duration
 	quit         chan struct{}
-	wg           *sync.WaitGroup
+	wg           sync.WaitGroup
 
-	mu              *sync.RWMutex // protects currentEndpoint and endpoints
+	mu              sync.RWMutex // protects currentEndpoint and endpoints
 	currentEndpoint int
 	endpoints       []Endpoint
 }
@@ -116,13 +117,12 @@ func New(config *Config) *LoadBalancer {
 	return &LoadBalancer{
 		apiAddr:      config.APIAddr,
 		client:       config.Client,
-		mu:           &sync.RWMutex{},
+		errorLog:     config.ErrorLog,
 		namespace:    config.Namespace,
 		retryDelay:   config.RetryDelay,
 		service:      config.Service,
 		syncInterval: config.SyncInterval,
 		quit:         make(chan struct{}),
-		wg:           &sync.WaitGroup{},
 	}
 }
 
@@ -191,6 +191,9 @@ func (c *Config) setDefaults() {
 	}
 	if c.Client == nil {
 		c.Client = http.DefaultClient
+	}
+	if c.ErrorLog == nil {
+		c.ErrorLog = log.New(os.Stderr, "", log.LstdFlags)
 	}
 	if c.Namespace == "" {
 		c.Namespace = DefaultNamespace
