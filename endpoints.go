@@ -24,8 +24,8 @@ const (
 )
 
 const (
-	defaultAPIHost      = "127.0.0.1:8001"
-	defaultNamespace    = "default"
+	DefaultAPIHost      = "127.0.0.1:8001"
+	DefaultNamespace    = "default"
 	defaultSyncInterval = 30 * time.Second
 	defaultRetryDelay   = 5 * time.Second
 )
@@ -54,8 +54,19 @@ type Endpoint struct {
 
 // A Config structure is used to configure a LoadBalancer.
 type Config struct {
+	// APIHost specifies the Kubernetes host/port (127.0.0.1:8001)
+	// If empty, APIHost is used.
+	APIHost string
+
 	// The http.Client used to perform requests to the Kubernetes API.
-	// If nil, http.DefaultClient is used.
+	// If nil, http.DefaultClient is used. Using the http.DefaultClient
+	// will require the use of kubectl running in proxy mode:
+	//
+	//    kubectl proxy
+	//
+	// For more advanced communication schemes clients must provide an
+	// http.Client with a custom transport to handle any authentication
+	// requirements or custom behavior.
 	Client *http.Client
 
 	// ErrorLog specifies an optional logger for errors
@@ -106,7 +117,7 @@ func New(config *Config) *LoadBalancer {
 	config.setDefaults()
 
 	return &LoadBalancer{
-		apiHost:      defaultAPIHost,
+		apiHost:      config.APIHost,
 		client:       config.Client,
 		mu:           &sync.Mutex{},
 		namespace:    config.Namespace,
@@ -166,11 +177,14 @@ func (lb *LoadBalancer) StartBackgroundSync() error {
 }
 
 func (c *Config) setDefaults() {
+	if c.APIHost == "" {
+		c.APIHost = DefaultAPIHost
+	}
 	if c.Client == nil {
 		c.Client = http.DefaultClient
 	}
 	if c.Namespace == "" {
-		c.Namespace = defaultNamespace
+		c.Namespace = DefaultNamespace
 	}
 	if c.RetryDelay <= 0 {
 		c.RetryDelay = defaultRetryDelay
