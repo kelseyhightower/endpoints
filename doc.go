@@ -25,7 +25,7 @@ be synchronized from the Kubernetes API:
     err := lb.SyncEndpoints()
 
 Once the initial set of endpoints have been populated clients
-can call the Next method an endpoint:
+can call the Next method to get an endpoint:
 
     endpoint, err := lb.Next()
     // ...
@@ -33,7 +33,7 @@ can call the Next method an endpoint:
     resp, err := c.Get(url)
     // ...
 
-Endpoings can be synchronized in the background:
+Endpoints can be synchronized in the background:
 
     err := lb.StartBackgroundSync()
 
