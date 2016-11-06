@@ -11,40 +11,33 @@
 
 package endpoints
 
-type Object struct {
-	Object Endpoints `json:"object"`
+type object struct {
+	Object endpoints `json:"object"`
 	Type   string    `json:"type"`
 }
 
-type Endpoints struct {
+type endpoints struct {
 	Kind       string   `json:"kind"`
 	ApiVersion string   `json:"apiVersion"`
-	Metadata   Metadata `json:"metadata"`
-	Subsets    []Subset `json:"subsets"`
+	Metadata   metadata `json:"metadata"`
+	Subsets    []subset `json:"subsets"`
 	Message    string   `json:"message"`
 }
 
-type Metadata struct {
+type metadata struct {
 	Name string `json:"name"`
 }
 
-type Subset struct {
-	Addresses []Address `json:"addresses"`
-	Ports     []Port    `json:"ports"`
+type subset struct {
+	Addresses []address `json:"addresses"`
+	Ports     []port    `json:"ports"`
 }
 
-type Address struct {
+type address struct {
 	IP string `json:"ip"`
 }
 
-type Port struct {
+type port struct {
 	Name string `json:"name"`
 	Port int32  `json:"port"`
-}
-
-// Endpoint holds a Kubernetes endpoint.
-type Endpoint struct {
-	Host  string
-	Port  string
-	Ports map[string]string
 }

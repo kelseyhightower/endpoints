@@ -52,6 +52,13 @@ var (
 	ErrMissingServiceName = errors.New("endpoints: missing service name")
 )
 
+// Endpoint holds a Kubernetes endpoint.
+type Endpoint struct {
+	Host  string
+	Port  string
+	Ports map[string]string
+}
+
 // A Config structure is used to configure a EndpointsManager.
 type Config struct {
 	// The http.Client used to perform requests to the Kubernetes API.
@@ -193,7 +200,7 @@ func (em *EndpointsManager) Shutdown() error {
 }
 
 func (em *EndpointsManager) syncEndpoints() error {
-	var eps Endpoints
+	var eps endpoints
 	r, err := em.get(context.TODO(), fmt.Sprintf(endpointsPath, em.namespace, em.service))
 	if err != nil {
 		return err
@@ -247,7 +254,7 @@ func (em *EndpointsManager) watch(ctx context.Context, wg *sync.WaitGroup) {
 				return
 			}
 
-			var o Object
+			var o object
 			err := decoder.Decode(&o)
 			if err != nil {
 				em.errorLog.Println(err)
@@ -289,7 +296,7 @@ func (em *EndpointsManager) get(ctx context.Context, path string) (io.ReadCloser
 	return resp.Body, nil
 }
 
-func formatEndpoints(endpoints Endpoints) []Endpoint {
+func formatEndpoints(endpoints endpoints) []Endpoint {
 	eps := make([]Endpoint, 0)
 	if len(endpoints.Subsets) == 0 {
 		return eps
