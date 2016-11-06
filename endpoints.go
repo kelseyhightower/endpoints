@@ -118,7 +118,7 @@ func New(config *Config) (*EndpointsManager, error) {
 		wg:           &sync.WaitGroup{},
 	}
 
-	err := em.SyncEndpoints()
+	err := em.syncEndpoints()
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +175,7 @@ func (em *EndpointsManager) reconcile() {
 	for {
 		select {
 		case <-time.After(em.syncInterval):
-			err := em.SyncEndpoints()
+			err := em.syncEndpoints()
 			if err != nil {
 				em.errorLog.Println(err)
 			}
@@ -192,7 +192,7 @@ func (em *EndpointsManager) Shutdown() error {
 	return nil
 }
 
-func (em *EndpointsManager) SyncEndpoints() error {
+func (em *EndpointsManager) syncEndpoints() error {
 	var eps Endpoints
 	r, err := em.get(context.TODO(), fmt.Sprintf(endpointsPath, em.namespace, em.service))
 	if err != nil {
