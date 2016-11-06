@@ -35,7 +35,7 @@ can call the Next method an endpoint:
 
 Endpoings can be synchronized in the background:
 
-    err := lb.StartBackgroundSync() 
+    err := lb.StartBackgroundSync()
 
 Shutdown terminates a load balancer instance by stopping any
 background watches and reconciliation loops against the Kubernetes

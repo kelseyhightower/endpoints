@@ -107,7 +107,7 @@ type LoadBalancer struct {
 	quit         chan struct{}
 	wg           *sync.WaitGroup
 
-	mu              *sync.Mutex // protects currentEndpoint and endpoints
+	mu              *sync.RWMutex // protects currentEndpoint and endpoints
 	currentEndpoint int
 	endpoints       []Endpoint
 }
@@ -116,13 +116,13 @@ type LoadBalancer struct {
 // The LoadBalancer endpoints list is populated by
 // the Sync and StartBackgroundSync methods.
 func New(config *Config) *LoadBalancer {
-	
+
 	config.setDefaults()
 
 	return &LoadBalancer{
 		apiHost:      config.APIHost,
 		client:       config.Client,
-		mu:           &sync.Mutex{},
+		mu:           &sync.RWMutex{},
 		namespace:    config.Namespace,
 		retryDelay:   config.RetryDelay,
 		service:      config.Service,
@@ -130,6 +130,15 @@ func New(config *Config) *LoadBalancer {
 		quit:         make(chan struct{}),
 		wg:           &sync.WaitGroup{},
 	}
+}
+
+// Endpoints returns a copy of the current set of endpoints.
+func (lb *LoadBalancer) Endpoints() []Endpoint {
+	lb.mu.RLock()
+	eps := make([]Endpoint, len(lb.endpoints))
+	copy(eps, lb.endpoints)
+	lb.mu.RUnlock()
+	return eps
 }
 
 // Next returns the next Kubernetes endpoint.
@@ -159,8 +168,8 @@ func (lb *LoadBalancer) Shutdown() error {
 // SyncEndpoints syncs the endpoints for the configured Kubernetes service.
 func (lb *LoadBalancer) SyncEndpoints() error {
 	if lb.service == "" {
-        return ErrMissingServiceName
-    }
+		return ErrMissingServiceName
+	}
 	return lb.syncEndpoints()
 }
 
@@ -168,8 +177,8 @@ func (lb *LoadBalancer) SyncEndpoints() error {
 // list of endpoints asynchronously.
 func (lb *LoadBalancer) StartBackgroundSync() error {
 	if lb.service == "" {
-        return ErrMissingServiceName
-    }
+		return ErrMissingServiceName
+	}
 
 	lb.wg.Add(1)
 	go lb.watchEndpoints()
