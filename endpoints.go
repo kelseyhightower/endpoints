@@ -24,10 +24,13 @@ const (
 )
 
 const (
-	DefaultAPIHost      = "127.0.0.1:8001"
-	DefaultNamespace    = "default"
 	defaultSyncInterval = 30 * time.Second
 	defaultRetryDelay   = 5 * time.Second
+)
+
+var (
+	DefaultAPIHost   = "127.0.0.1:8001"
+	DefaultNamespace = "default"
 )
 
 var (
