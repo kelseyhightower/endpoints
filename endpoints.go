@@ -285,7 +285,7 @@ func (lb *LoadBalancer) watch(ctx context.Context, wg *sync.WaitGroup) {
 			var o object
 			err := decoder.Decode(&o)
 			if err != nil {
-				lb.errorLog.Println(err)
+				lb.errorLog.Printf("endpoints watch %s: %s", path, err)
 				r.Close()
 				break
 			}
@@ -308,7 +308,7 @@ type SyncError struct {
 }
 
 func (e *SyncError) Error() string {
-	return fmt.Sprintf("endpoints get %s: %s %d", e.URL, e.Message, e.Code)
+	return fmt.Sprintf("endpoints Get %s: %s %d", e.URL, e.Message, e.Code)
 }
 
 func (lb *LoadBalancer) get(ctx context.Context, path string) (io.ReadCloser, error) {
@@ -327,7 +327,7 @@ func (lb *LoadBalancer) get(ctx context.Context, path string) (io.ReadCloser, er
 
 	resp, err := lb.client.Do(r.WithContext(ctx))
 	if err != nil {
-		return nil, &SyncError{url, err.Error(), 500}
+		return nil, errors.New("endpoints: " + err.Error())
 	}
 
 	if resp.StatusCode != 200 {
