@@ -26,6 +26,11 @@ import (
 )
 
 const (
+	endpointsPath      = "/api/v1/namespaces/%s/endpoints/%s"
+	endpointsWatchPath = "/api/v1/watch/namespaces/%s/endpoints/%s"
+)
+
+const (
 	DefaultAPIHost      = "127.0.0.1:8001"
 	DefaultNamespace    = "default"
 	DefaultSyncInterval = 30 * time.Second
@@ -36,6 +41,10 @@ var (
 	// ErrNoEndpoints is returned by EndpointsManager.Next calls
 	// when a named service has no backends.
 	ErrNoEndpoints = errors.New("endpoints: no endpoints available")
+
+	// ErrNotExist is returned when attempting to lookup a service
+	// that does not exist in the request namespace.
+	ErrNotExist = errors.New("endpoints: service does not exist")
 
 	// ErrMissingServiceName is returned by New when attempting
 	// to initilizate an EndpointsManager with a config that
@@ -96,7 +105,6 @@ func New(config *Config) (*EndpointsManager, error) {
 	}
 
 	config.setDefaults()
-	wg := &sync.WaitGroup{}
 
 	em := &EndpointsManager{
 		apiHost:      DefaultAPIHost,
@@ -107,7 +115,7 @@ func New(config *Config) (*EndpointsManager, error) {
 		service:      config.Service,
 		syncInterval: config.SyncInterval,
 		quit:         make(chan struct{}),
-		wg:           wg,
+		wg:           &sync.WaitGroup{},
 	}
 
 	err := em.SyncEndpoints()
@@ -116,10 +124,10 @@ func New(config *Config) (*EndpointsManager, error) {
 	}
 
 	// Start watching for changes to the endpoint.
-	wg.Add(1)
+	em.wg.Add(1)
 	go em.watchEndpoints()
 	// Start reconciliation loop.
-	wg.Add(1)
+	em.wg.Add(1)
 	go em.reconcile()
 
 	return em, nil

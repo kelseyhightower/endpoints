@@ -11,14 +11,6 @@
 
 package endpoints
 
-import "errors"
-
-var (
-	apiHost            = "127.0.0.1:8001"
-	endpointsPath      = "/api/v1/namespaces/%s/endpoints/%s"
-	endpointsWatchPath = "/api/v1/watch/namespaces/%s/endpoints/%s"
-)
-
 type Object struct {
 	Object Endpoints `json:"object"`
 	Type   string    `json:"type"`
@@ -56,5 +48,3 @@ type Endpoint struct {
 	Port  string
 	Ports map[string]string
 }
-
-var ErrNotExist = errors.New("does not exist")
