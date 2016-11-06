@@ -1,8 +1,8 @@
 # Kubernetes Endpoint Load Balancer
 
-## Usage
+## Example Usage
 
-```
+```Go
 package main
 
 import (
