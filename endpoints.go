@@ -65,7 +65,8 @@ type Config struct {
 	// If nil, http.DefaultClient is used. Using the http.DefaultClient
 	// will require the use of kubectl running in proxy mode:
 	//
-	//    kubectl proxy
+	//    $ kubectl proxy
+	//    Starting to serve on 127.0.0.1:8001
 	//
 	// For more advanced communication schemes clients must provide an
 	// http.Client with a custom transport to handle any authentication
